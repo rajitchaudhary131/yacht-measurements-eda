@@ -1,0 +1,100 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+# Load the dataset using whitespace delimiter and specifying no header row
+# Prefixed the separator string with 'r' to make it a raw string literal and avoid SyntaxWarnings
+df = pd.read_csv('/content/yacht+hydrodynamics.zip', sep=r'\s+', header=None)
+
+# Assign descriptive column names based on the Yacht Hydrodynamics dataset specification
+df.columns = [
+    'Longitudinal_Position',
+    'Prismatic_Coefficient',
+    'Length_Displacement_Ratio',
+    'Beam_Draught_Ratio',
+    'Length_Beam_Ratio',
+    'Froude_Number',
+    'Residuary_Resistance'
+]
+
+print(df.head())
+print("Shape (rows, columns):", df.shape)
+print("\n--- First 5 rows ---")
+print(df.head())
+
+print("\n--- Last 5 rows ---")
+print(df.tail())
+
+print("\n--- DataFrame Info ---")
+print(df.info())
+
+print("\n--- Summary Statistics (describe) ---")
+print(df.describe())
+print("--- Missing Values per Column ---")
+print(df.isnull().sum())
+
+print("\nTotal duplicate rows:", df.duplicated().sum())
+
+# Optional: inspect duplicate rows if any exist
+if df.duplicated().sum() > 0:
+    print(df[df.duplicated(keep=False)])
+# Convert DataFrame to a NumPy array for array-based calculations
+data_np = df.to_numpy()
+
+stats_summary = pd.DataFrame({
+    "mean": np.mean(data_np, axis=0),
+    "median": np.median(data_np, axis=0),
+    "min": np.min(data_np, axis=0),
+    "max": np.max(data_np, axis=0),
+    "std_dev": np.std(data_np, axis=0, ddof=1)  # sample std dev (matches df.std())
+}, index=df.columns)
+
+print("--- Summary Statistics via NumPy ---")
+print(stats_summary)
+
+largest_std_col = stats_summary["std_dev"].idxmax()
+largest_std_val = stats_summary["std_dev"].max()
+print(f"\n(2) Measurement with largest standard deviation: {largest_std_col} ({largest_std_val:.4f})")
+top_10_resistance = df.sort_values(by="Residuary_Resistance", ascending=False).head(10)
+print("--- Top 10 Records with Highest Residuary Resistance ---")
+print(top_10_resistance)
+# Define explicit Froude number ranges
+bins = [-np.inf, 0.25, 0.35, np.inf]
+labels = ["Low (<= 0.25)", "Medium (0.25 - 0.35)", "High (> 0.35)"]
+
+# Corrected column name from 'froude_number' to 'Froude_Number'
+df["froude_group"] = pd.cut(df["Froude_Number"], bins=bins, labels=labels)
+
+print("--- Count of Records per Froude Group ---")
+print(df["froude_group"].value_counts(dropna=False))
+
+print("\n--- Average Residuary Resistance by Froude Group ---")
+# Corrected column name from 'residuary_resistance' to 'Residuary_Resistance'
+grouped_resistance = df.groupby("froude_group", observed=False)["Residuary_Resistance"].agg(
+    count="count",
+    mean_resistance="mean",
+    median_resistance="median",
+    max_resistance="max"
+)
+print(grouped_resistance)
+# Chart 1: Scatter plot of Residuary Resistance vs. Froude Number
+plt.figure(figsize=(8, 5))
+# Corrected 'froude_number' to 'Froude_Number' and 'residuary_resistance' to 'Residuary_Resistance'
+plt.scatter(df["Froude_Number"], df["Residuary_Resistance"], alpha=0.75)
+plt.title("Residuary Resistance vs. Froude Number")
+plt.xlabel("Froude Number")
+plt.ylabel("Residuary Resistance")
+plt.grid(True, linestyle="--", alpha=0.5)
+plt.tight_layout()
+plt.show()
+
+# Chart 2: Bar chart of Average Residuary Resistance by Froude Group
+plt.figure(figsize=(7, 4.5))
+grouped_resistance["mean_resistance"].plot(kind="bar")
+plt.title("Average Residuary Resistance by Froude Number Group")
+plt.xlabel("Froude Number Group")
+plt.ylabel("Mean Residuary Resistance")
+plt.xticks(rotation=0)
+plt.grid(axis="y", linestyle="--", alpha=0.5)
+plt.tight_layout()
+plt.show()
